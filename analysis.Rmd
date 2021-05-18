@@ -1,0 +1,309 @@
+---
+title: "R Notebook"
+output:
+  html_notebook: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+
+
+### Reading data from the xlsx file
+```{r}
+library(readxl)
+model <- read_excel('Real estate valuation data set.xlsx')
+View(model)
+```
+
+```{r}
+model = subset(model, select = -c(No))
+attach(model)
+```
+
+```{r}
+summary(model)
+```
+### Get the scatterplot matrix and pairwise correlations
+```{r}
+pairs(model) #scatterplot matrix
+cor(model) #pairwise correlations
+```
+
+### Full model
+```{r}
+model.full <- lm(price ~ dateofpurchase + age + distance +  stores + latitude+ longitude)
+summary(model.full)
+```
+
+### Full model residual diagnostics
+
+```{r}
+par(mfrow = c(3, 3), pch = 19)
+plot(resid(model.full) ~ fitted(model.full), xlab = "Fitted", ylab = "Residual")
+title("(a) Residual Plot against Fitted")
+
+plot(resid(model.full) ~ dateofpurchase, xlab = "transaction date", ylab = "Residual")
+title("(b) Residual Plot against transaction date")
+
+plot(resid(model.full) ~ age, xlab = "house age", ylab = "Residual")
+title("(c) Residual Plot against  house age")
+
+plot(resid(model.full) ~ distance, xlab = "distance", ylab = "Residual")
+title("(d) Residual Plot against distance")
+
+plot(resid(model.full) ~  stores, xlab = "number of convenience stores", ylab = "Residual")
+title("(e) Residual Plot against number of convenience stores")
+
+plot(resid(model.full) ~  latitude, xlab = "latitude", ylab = "Residual")
+title("(f) Residual Plot against latitude")
+
+plot(resid(model.full) ~longitude, xlab = "longitude", ylab = "Residual")
+title("(g) Residual Plot against longitude")
+
+plot(model.full,which=2)
+```
+### Statistical tests for assumption violations
+```{r}
+library(lmtest)
+shapiro.test(resid(model.full)) # Shapiro-Wilk normality test
+bptest(model.full, studentize = F) # Breusch-Pagan test
+```
+#### Both normality and constant variance assumptions are violated!
+
+### Perform a Box Cox transformation to see if we can fix the assumption violatons 
+```{r}
+library(MASS) # Load (install if needed) the MASS package
+par(mfrow=c(1, 1)) #Reset to one plot per frame.
+boxcox(model.full,plotit=T)
+boxcox(model.full,plotit=T,lambda=seq(-0.25,0.25,by=0.05))### Zoom in on the 95% confidence interval area
+```
+#### log(Y) transformation seems to be ideal
+```{r}
+model.log <- lm(log(price) ~ dateofpurchase + age + distance +  stores + latitude+ longitude)
+summary(model.log)
+```
+### log model residual diagnostics
+```{r}
+par(mfrow = c(3, 3), pch = 19)
+plot(resid(model.log) ~ fitted(model.log), xlab = "Fitted", ylab = "Residual")
+title("(a) Residual Plot against Fitted")
+
+plot(resid(model.log) ~ dateofpurchase, xlab = "transaction date", ylab = "Residual")
+title("(b) Residual Plot against transaction date")
+
+plot(resid(model.log) ~ age, xlab = "house age", ylab = "Residual")
+title("(c) Residual Plot against  house age")
+
+plot(resid(model.log) ~ distance, xlab = "distance", ylab = "Residual")
+title("(d) Residual Plot against distance")
+
+plot(resid(model.log) ~  stores, xlab = "number of convenience stores", ylab = "Residual")
+title("(e) Residual Plot against number of convenience stores")
+
+plot(resid(model.log) ~  latitude, xlab = "latitude", ylab = "Residual")
+title("(f) Residual Plot against latitude")
+
+plot(resid(model.log) ~longitude, xlab = "longitude", ylab = "Residual")
+title("(g) Residual Plot against longitude")
+
+plot(model.log,which=2)
+```
+### Statistical tests for assumption violations (for log model)
+```{r}
+library(lmtest)
+shapiro.test(resid(model.log)) # Shapiro-Wilk normality test
+bptest(model.log, studentize = F) # Breusch-Pagan test
+```
+### The transformation didn't seem to help, the assumptions are still not met!
+
+### Overall F-test
+```{r}
+model.intercept <- lm(price~1)
+anova(model.intercept, model.full)
+```
+#### At least one of the predictor variables is significant.
+
+
+### Variable added in order and last tests (Type I and III SS)
+```{r}
+library(car)
+anova(model.full) # Type I SS – Variables Added in Order
+
+Anova(model.full) # Type III SS -Variables Added Last
+```
+### Running SLR models for each predictor to get an idea of importance of each variable
+```{r}
+dateofpurchase.lm <- lm(price~dateofpurchase) 
+age.lm <- lm(price~age)
+distance.lm <- lm(price~distance)
+stores.lm <- lm(price~stores)
+latitude.lm <- lm(price~latitude)
+longitude.lm <- lm(price~longitude)
+# summary(dateofpurchase.lm)
+# summary(age.lm)
+# summary(distance.lm)
+# summary(stores.lm)
+# summary(latitude.lm)
+# summary(longitude.lm)
+```
+#### Summary of SLR code and results
+     Variable         P-value       R-square
+     
+     dateofpurchase   0.0752        0.007661  
+      age             1.56e-05      0.04434
+      distance        <2e-16        0.4538
+      stores          <2e-16        0.326
+      latitude        <2e-16        0.2985
+      longitude       <2e-16        0.2738
+      
+#### distance predictor variable seems to have the highest r-squared value
+
+### Regress Residuals of distance.lm on other variables and obtain the R-squares
+```{r}
+# summary(lm(resid(distance.lm)~dateofpurchase))
+# summary(lm(resid(distance.lm)~age))
+# summary(lm(resid(distance.lm)~stores))
+# summary(lm(resid(distance.lm)~latitude))
+# summary(lm(resid(distance.lm)~longitude))
+
+```
+#### Result
+     Variable         R-square
+     
+     dateofpurchase   0.03025 
+      age             0.06841
+      stores          0.04992
+      latitude        0.04018
+      longitude       0.000722
+      
+#### We try adding variables one by one to the single variable model in the increasing order of r-squared value
+```{r}
+model.two <- lm(price~distance+age)
+model.three <- lm(price~distance+age+stores)
+model.four <- lm(price~distance+age+stores+latitude)
+model.five <- lm(price~distance+age+stores+latitude+dateofpurchase)
+```
+
+#### Summary of 1,2,3,4,5 variable and the full model
+
+     Variables                                    R-square   Adjusted R-square
+     in model
+     
+     distance                                       0.4538      0.4524
+     distance+age                                   0.4911      0.4887
+     distance+age+stores                            0.5411      0.5377
+     distance+age+stores+latitude                   0.5711      0.5669
+     distance+age+stores+latitude+dateofpurchase    0.5823      0.5772  
+     All variables                                  0.5824      0.5762  
+
+#### The five variable model offers a slight increase in adjusted r-square compared to the full model, so we choose this model for further exploration
+
+### Five variable model residual diagnostics
+```{r}
+par(mfrow = c(3, 3), pch = 19)
+plot(resid(model.five) ~ fitted(model.five), xlab = "Fitted", ylab = "Residual")
+title("(a) Residual Plot against Fitted")
+
+plot(resid(model.five) ~ dateofpurchase, xlab = "transaction date", ylab = "Residual")
+title("(b) Residual Plot against transaction date")
+
+plot(resid(model.five) ~ age, xlab = "house age", ylab = "Residual")
+title("(c) Residual Plot against  house age")
+
+plot(resid(model.five) ~ distance, xlab = "distance", ylab = "Residual")
+title("(d) Residual Plot against distance")
+
+plot(resid(model.five) ~  stores, xlab = "number of convenience stores", ylab = "Residual")
+title("(e) Residual Plot against number of convenience stores")
+
+plot(resid(model.five) ~  latitude, xlab = "latitude", ylab = "Residual")
+title("(f) Residual Plot against latitude")
+
+plot(model.five,which=2)
+```
+### Statistical tests for assumption violations (five variable model)
+```{r}
+library(lmtest)
+shapiro.test(resid(model.five)) # Shapiro-Wilk normality test
+bptest(model.five, studentize = F) # Breusch-Pagan test
+```
+#### The assumptions are still not met!
+
+### General Linear Test (GLT)
+```{r}
+anova(model.five, model.full)
+```
+##### We fail to reject the null hypothesis, this means the "longitude" variable does not add any significance to the five variable model.
+
+
+#### We suspect the presence of outliers in the data which is leading to assumption violations
+
+### Using cook's distance to find and remove the outliers
+```{r}
+library(readxl)
+model <- read_excel('Real estate valuation data set.xlsx')
+# View(model)
+attach(model)
+model.five <- lm(price~distance + age + stores + latitude + dateofpurchase)
+cooksd <- cooks.distance(model.five)
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  # plot cook's distance
+abline(h = 4*mean(cooksd, na.rm=T), col="red")  # add cutoff line
+text(x=1:length(cooksd)+1, y=cooksd, labels=ifelse(cooksd>4*mean(cooksd, na.rm=T),names(cooksd),""), col="red")
+influential <- as.numeric(names(cooksd)[(cooksd > 4*mean(cooksd, na.rm=T))])  # influential row numbers
+data <- model[-influential,]
+```
+
+### Building a new five variable model with outliers removed from the dataset
+
+
+```{r}
+data.five <- lm(log(data$price)~data$age+data$stores+data$latitude+data$dateofpurchase)
+summary(data.five)
+```
+### Residual diagnostics of the model
+
+```{r}
+plot(data.five,which=1)
+plot(data.five,which=2)
+```
+### Statistical tests for assumption violations
+```{r}
+
+library(car)
+leveneTest(resid(data.five), cut(data$age+data$stores+data$latitude+data$dateofpurchase, 2))
+shapiro.test(resid(data.five))
+```
+
+### Assumptions are met!
+
+
+### Cross validation
+```{r}
+library(caret)
+set.seed(1234)
+# split the dataset into training (80%) and test data (20%)
+training.samples<-createDataPartition(data$price,p=0.8,list=FALSE)
+train.data<-data[training.samples,]
+test.data<-data[-training.samples,]
+```
+
+### Fitting the model using training data
+```{r}
+data.five <- lm(log(price) ~ age + stores + latitude + dateofpurchase,data=train.data)
+summary(data.five)
+```
+
+### Making predictions using test data
+```{r}
+predictions<-predict(data.five,test.data)
+```
+### Evaluation
+
+```{r}
+data.frame(r2=R2(predictions, test.data$price),rmse=RMSE(predictions,test.data$price),MAE=MAE(predictions,test.data$price))
+```
+### Results and Conclusion
+<h5> Cross validation shows good agreement of model with training and testing datasets evident from the small increase of 0.025 in the R2. This R2 shows that approximately 68% of the housing price per unit area is described by the transaction date, house age, number of convenience stores nearby, and the latitude. The distance to the nearest train station and the longitude were found not to be significant in succinctly describing the housing price, though we concluded there is significant relationships between housing price and the other 4 predictor variables. The estimated regression line for housing price per unit area is as follows:
+log(Ŷ) = 
+-505.8 + (-9.22e-03)(age) + (5.24e-02)(stores) + (15.69)(latitude) + (5.84e-02)(date) </h5>
